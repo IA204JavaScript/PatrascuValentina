@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Календарь с заметками</title>
+  <style>
+    body {
+      font-family: 'Times New Roman', serif;
+      background-color: #f5f5f5;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+    #calendar {
+      width: 320px;
+      background: #fff;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      height: fit-content;
+    }
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .calendar-header button {
+      font-size: 18px;
+      padding: 5px 10px;
+      background: none;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .calendar-header h2 {
+      font-size: 20px;
+      margin: 0;
+    }
+    .weekdays, #daysGrid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      gap: 5px;
+    }
+    .weekdays div {
+      font-weight: bold;
+      padding: 5px 0;
+    }
+    #daysGrid div {
+      padding: 10px 0;
+      border: 1px solid #ddd;
+      min-height: 40px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #daysGrid div.has-note {
+      color: #2e7d32;
+      font-weight: bold;
+    }
+    #noteSidebar {
+      width: 250px;
+      background: #fff;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      position: sticky;
+      top: 20px;
+    }
+    #noteContent {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      min-height: 100px;
+    }
+    #noteForm {
+      margin-top: 20px;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      margin-bottom: 10px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button[type="submit"] {
+      background: #2e7d32;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div id="calendar">
+  <div class="calendar-header">
+    <button id="prevMonth">←</button>
+    <h2 id="currentMonth"></h2>
+    <button id="nextMonth">→</button>
+  </div>
+  <div class="weekdays">
+    <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+  </div>
+  <div id="daysGrid"></div>
+</div>
+
+<div id="noteSidebar">
+  <h3 id="sidebarDate">Выберите день</h3>
+  <div id="noteContent">Заметок нет</div>
+  <form id="noteForm">
+    <textarea id="noteText" placeholder="Добавьте заметку..."></textarea>
+    <button type="submit">Сохранить</button>
+  </form>
+</div>
+
+<script>
+  const notes = JSON.parse(localStorage.getItem('calendarNotes')) || {};
+
+  const currentMonthEl = document.getElementById('currentMonth');
+  const daysGrid = document.getElementById('daysGrid');
+  const prevMonthBtn = document.getElementById('prevMonth');
+  const nextMonthBtn = document.getElementById('nextMonth');
+  const sidebarDateEl = document.getElementById('sidebarDate');
+  const noteContentEl = document.getElementById('noteContent');
+  const noteForm = document.getElementById('noteForm');
+  const noteText = document.getElementById('noteText');
+
+  let currentDate = new Date();
+  let selectedDate = null;
+
+  function renderCalendar(date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDay = (firstDay.getDay() + 6) % 7;
+
+    daysGrid.innerHTML = '';
+    currentMonthEl.textContent = date.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+    for (let i = 0; i < startDay; i++) {
+      daysGrid.innerHTML += '<div></div>';
+    }
+
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      const dateStr = `${year}-${month+1}-${day}`;
+      const hasNote = notes[dateStr] ? 'has-note' : '';
+      daysGrid.innerHTML += `<div class="${hasNote}" data-date="${dateStr}">${day}</div>`;
+    }
+
+    document.querySelectorAll('#daysGrid div[data-date]').forEach(dayEl => {
+      dayEl.addEventListener('click', () => showNote(dayEl.dataset.date));
+    });
+  }
+
+  function showNote(dateStr) {
+    selectedDate = dateStr;
+    const [year, month, day] = dateStr.split('-');
+    const date = new Date(year, month-1, day);
+
+    sidebarDateEl.textContent = date.toLocaleDateString('ru-RU', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long'
+    });
+
+    noteContentEl.textContent = notes[dateStr] || 'Заметок нет';
+    noteText.value = notes[dateStr] || '';
+  }
+
+  noteForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    if (selectedDate) {
+      if (noteText.value.trim()) {
+        notes[selectedDate] = noteText.value.trim();
+        document.querySelector(`#daysGrid div[data-date="${selectedDate}"]`).classList.add('has-note');
+      } else {
+        delete notes[selectedDate];
+        document.querySelector(`#daysGrid div[data-date="${selectedDate}"]`).classList.remove('has-note');
+      }
+
+      localStorage.setItem('calendarNotes', JSON.stringify(notes));
+      noteContentEl.textContent = notes[selectedDate] || 'Заметок нет';
+    }
+  });
+
+  prevMonthBtn.onclick = () => {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    renderCalendar(currentDate);
+    selectedDate = null;
+    sidebarDateEl.textContent = 'Выберите день';
+    noteContentEl.textContent = 'Заметок нет';
+    noteText.value = '';
+  };
+
+  nextMonthBtn.onclick = () => {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar(currentDate);
+    selectedDate = null;
+    sidebarDateEl.textContent = 'Выберите день';
+    noteContentEl.textContent = 'Заметок нет';
+    noteText.value = '';
+  };
+
+  renderCalendar(currentDate);
+</script>
+
+</body>
+</html>
